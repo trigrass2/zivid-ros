@@ -30,7 +30,7 @@ find_package(catkin REQUIRED COMPONENTS
   nodelet
 )
 
-find_package(Zivid 1.8.0 COMPONENTS Core REQUIRED)
+find_package(Zivid 2.0.0 COMPONENTS Core REQUIRED)
 message(STATUS "Found Zivid version ${Zivid_VERSION}")
 
 find_package(OpenMP REQUIRED)
@@ -47,31 +47,34 @@ target_include_directories(
 )
 target_link_libraries(${SETTINGS_GENERATOR_TARGET_NAME} PRIVATE Zivid::Core)
 
-
 set(GENERATOR_TARGET_NAME ${PROJECT_NAME}_generator)
 add_custom_target(
   ${GENERATOR_TARGET_NAME}
   COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/state_srv_files
   COMMAND mkdir -p ${CMAKE_CURRENT_BINARY_DIR}/generated_headers
   COMMAND ${SETTINGS_GENERATOR_TARGET_NAME}
-  COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/CaptureFrame.cfg
-  COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/CaptureGeneral.cfg
-  COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/Capture2DFrame.cfg
-  BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/CaptureFrame.cfg
-             ${CMAKE_CURRENT_BINARY_DIR}/CaptureGeneral.cfg
+  COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/SettingsAcquisition.cfg
+  COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/Settings.cfg
+  COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/Settings2DAcquisition.cfg
+  COMMAND chmod a+x ${CMAKE_CURRENT_BINARY_DIR}/Settings2D.cfg
+  BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/SettingsAcquisition.cfg
+             ${CMAKE_CURRENT_BINARY_DIR}/Settings.cfg
+             ${CMAKE_CURRENT_BINARY_DIR}/Settings2DAcquisition.cfg
              ${CMAKE_CURRENT_BINARY_DIR}/Capture2DFrame.cfg
-             ${CMAKE_CURRENT_BINARY_DIR}/generated_headers/CaptureFrameConfigUtils.h
-             ${CMAKE_CURRENT_BINARY_DIR}/generated_headers/CaptureGeneralConfigUtils.h
-             ${CMAKE_CURRENT_BINARY_DIR}/generated_headers/Capture2DFrameConfigUtils.h
+             ${CMAKE_CURRENT_BINARY_DIR}/generated_headers/SettingsAcquisitionConfigUtils.h
+             ${CMAKE_CURRENT_BINARY_DIR}/generated_headers/SettingsConfigUtils.h
+             ${CMAKE_CURRENT_BINARY_DIR}/generated_headers/Settings2DAcquisitionConfigUtils.h
+             ${CMAKE_CURRENT_BINARY_DIR}/generated_headers/Settings2DConfigUtils.h
   COMMENT "Running generator"
 )
 
 set(LIBRARY_NAME ${PROJECT_NAME})
 
 generate_dynamic_reconfigure_options(
-  ${CMAKE_CURRENT_BINARY_DIR}/CaptureGeneral.cfg
-  ${CMAKE_CURRENT_BINARY_DIR}/CaptureFrame.cfg
-  ${CMAKE_CURRENT_BINARY_DIR}/Capture2DFrame.cfg
+  ${CMAKE_CURRENT_BINARY_DIR}/Settings.cfg
+  ${CMAKE_CURRENT_BINARY_DIR}/SettingsAcquisition.cfg
+  ${CMAKE_CURRENT_BINARY_DIR}/Settings2D.cfg
+  ${CMAKE_CURRENT_BINARY_DIR}/Settings2DAcquisition.cfg
 )
 add_dependencies(${PROJECT_NAME}_gencfg ${GENERATOR_TARGET_NAME})
 add_service_files(
@@ -102,7 +105,11 @@ catkin_package(
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY INCLUDE_DIRECTORIES "")
 
 # Library
-add_library(${LIBRARY_NAME} src/zivid_camera.cpp)
+add_library(
+  ${LIBRARY_NAME}
+  src/zivid_camera.cpp
+  src/capture_settings_controller.cpp
+)
 turn_on_compiler_warnings_if_enabled(${LIBRARY_NAME})
 target_include_directories(
   ${LIBRARY_NAME}

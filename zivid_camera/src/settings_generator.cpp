@@ -17,34 +17,30 @@
 
 namespace
 {
-template <class T>
+template <typename T>
 using NormalizedType = std::remove_const_t<std::remove_reference_t<T>>;
-
-template <class T, class ZividSettingNode>
-constexpr bool is_zivid_setting = std::is_same<NormalizedType<T>, ZividSettingNode>::value;
-
-template <class T>
-constexpr bool is_filters = is_zivid_setting<T, Zivid::Settings::Filters>;
-
-template <class T>
-constexpr bool is_color_balance =
-    is_zivid_setting<T, Zivid::Settings::BlueBalance> || is_zivid_setting<T, Zivid::Settings::RedBalance>;
-
-template <class T>
-constexpr bool is_general_setting = is_filters<T> || is_color_balance<T>;
-
-template <typename C, typename = void>
-struct HasRange : std::false_type
-{
-};
-
-template <typename C>
-struct HasRange<C, std::void_t<decltype(std::declval<C>().range())>> : std::true_type
-{
-};
 
 template <typename T>
 struct DependentFalse : std::false_type
+{
+};
+
+template <typename T, typename...>
+struct IsInList : std::false_type
+{
+};
+
+template <typename T, typename First, typename... Rest>
+struct IsInList<T, First, Rest...>
+  : std::integral_constant<bool, std::is_same<T, First>::value || IsInList<T, Rest...>::value>
+{
+};
+
+template <typename T, typename Tuple>
+struct IsInTuple;
+
+template <typename T, typename... Ts>
+struct IsInTuple<T, std::tuple<Ts...>> : IsInList<T, Ts...>
 {
 };
 
@@ -80,19 +76,64 @@ void writeToFile(const std::string& file_name, const std::string& text)
   }
 }
 
-std::string convertSettingsPathToZividClassName(const std::string& zivid_settings_class_name, const std::string& path)
+template <typename RootType, typename SettingsNode>
+std::string convertSettingsPathToConfigPath()
 {
-  return "Zivid::" + zivid_settings_class_name + "::" + boost::replace_all_copy<std::string>(path, "/", "::");
-}
+  auto path = std::string(SettingsNode::path);
+  const auto root_path = std::string(RootType::path);
 
-std::string convertSettingsPathToConfigPath(std::string path)
-{
+  if (!root_path.empty())
+  {
+    const auto expected_prefix = root_path + "/";
+    if (path.substr(0, expected_prefix.length()) != expected_prefix)
+    {
+      throw std::runtime_error("Expected path '" + path + "' to begin with '" + expected_prefix + "'");
+    }
+    path = path.substr(expected_prefix.length());
+  }
+
   path = boost::replace_all_copy<std::string>(path, "/", "_");
   const std::regex re("([^_^])([A-Z])");
   path = std::regex_replace(path, re, "$1_$2");  // Convert e.g. ExposureTime to Exposure_Time
   return boost::algorithm::to_lower_copy(path);
 }
 
+template <typename RootType>
+std::string zividSettingsTypeName()
+{
+  if constexpr (std::is_same_v<RootType, Zivid::Settings> || IsInTuple<RootType, Zivid::Settings::Descendants>::value ||
+                std::is_same_v<RootType, Zivid::Settings::Acquisition> ||
+                IsInTuple<RootType, Zivid::Settings::Acquisition::Descendants>::value)
+  {
+    return Zivid::Settings::name;
+  }
+  else if constexpr (std::is_same_v<RootType, Zivid::Settings2D> ||
+                     IsInTuple<RootType, Zivid::Settings2D::Descendants>::value ||
+                     std::is_same_v<RootType, Zivid::Settings2D::Acquisition> ||
+                     IsInTuple<RootType, Zivid::Settings2D::Acquisition::Descendants>::value)
+  {
+    return Zivid::Settings2D::name;
+  }
+  else
+  {
+    static_assert(DependentFalse<RootType>::value, "Unhandled type.");
+  }
+}
+
+template <typename SettingsNode>
+std::string fullyQualifiedZividClassType()
+{
+  std::stringstream ss;
+  ss << "Zivid::" + zividSettingsTypeName<SettingsNode>();
+  const auto path = std::string(SettingsNode::path);
+  if (!path.empty())
+  {
+    ss << "::" << boost::replace_all_copy<std::string>(path, "/", "::");
+  }
+  return ss.str();
+}
+
+template <typename RootType>
 class DynamicReconfigureCfgGenerator
 {
 public:
@@ -100,7 +141,25 @@ public:
   {
   }
 
-  template <class ValueType>
+  template <typename SettingsNode>
+  auto cfgDefaultValue()
+  {
+    // The default value of settings varies per Zivid camera model. Thus, we cannot set a
+    // correct static hard-coded default value for the setting here. To correctly use the
+    // Zivid driver the user must load the default values via dynamic_reconfigure at runtime.
+    using ValueType = typename SettingsNode::ValueType;
+    if constexpr (std::is_same_v<ValueType, bool>)
+    {
+      return false;
+    }
+    if constexpr (Zivid::DataModel::HasValidRange<SettingsNode>::value)
+    {
+      return SettingsNode::validRange().min();
+    }
+    return ValueType{ 0 };
+  }
+
+  template <typename ValueType>
   auto convertValueToRosValue(ValueType value)
   {
     // Convert from our own setting value types to types that ROS params supports (double, int, bool)
@@ -123,7 +182,7 @@ public:
     }
   }
 
-  template <class RosType>
+  template <typename RosType>
   std::string rosTypeName()
   {
     if constexpr (std::is_same_v<RosType, bool>)
@@ -144,7 +203,7 @@ public:
     }
   }
 
-  template <class RosType>
+  template <typename RosType>
   std::string rosTypeToString(RosType v)
   {
     if constexpr (std::is_same_v<RosType, bool>)
@@ -161,28 +220,33 @@ public:
     }
   }
 
-  template <class ValueType>
+  template <typename ValueType>
   std::string valueTypeToRosTypeString(ValueType v)
   {
     return rosTypeToString(convertValueToRosValue(v));
   }
 
-  template <class ZividSettingNode>
-  void apply(const ZividSettingNode& s)
+  template <typename SettingsNode>
+  void apply(const SettingsNode& n)
   {
-    const auto setting_name = convertSettingsPathToConfigPath(s.path);
+    const auto setting_name = convertSettingsPathToConfigPath<RootType, SettingsNode>();
     const auto level = "0";
     // Newlines must be converted to \\n so that the auto-generated files end up being correct
-    const auto description = boost::replace_all_copy<std::string>(s.description, "\n", R"(\\n)");
-    const auto type_name = rosTypeName<decltype(convertValueToRosValue(s.value()))>();
-    const auto default_value = valueTypeToRosTypeString(s.value());
+    const auto description = boost::replace_all_copy<std::string>(n.description, "\n", R"(\\n)");
+
+    const auto cfg_default_value = cfgDefaultValue<SettingsNode>();
+
+    const auto type_name = rosTypeName<decltype(convertValueToRosValue(cfg_default_value))>();
+
+    const auto default_value_str = valueTypeToRosTypeString(cfg_default_value);
 
     ss_ << "gen.add(\"" << setting_name << "\", " << type_name << ", " << level << ", "
-        << "\"" << description << "\", " << default_value;
+        << "\"" << description << "\", " << default_value_str;
 
-    if constexpr (HasRange<NormalizedType<ZividSettingNode>>::value)
+    if constexpr (Zivid::DataModel::HasValidRange<SettingsNode>::value)
     {
-      ss_ << ", " << valueTypeToRosTypeString(s.range().min()) << ", " << valueTypeToRosTypeString(s.range().max());
+      ss_ << ", " << valueTypeToRosTypeString(n.validRange().min()) << ", "
+          << valueTypeToRosTypeString(n.validRange().max());
     }
     ss_ << ")\n";
   }
@@ -195,17 +259,17 @@ public:
   std::string str()
   {
     std::stringstream res;
-    res << "#!/usr/bin/env python\n\n"
-           "# This is an auto-generated cfg file. Do not edit!\n\n"
-           "PACKAGE = \"zivid_camera\"\n"
-           "import roslib\n"
-           "roslib.load_manifest(PACKAGE);\n"
-           "from dynamic_reconfigure.parameter_generator_catkin import *\n\n";
+    res << "#!/usr/bin/env python\n\n";
+    res << "# This is an auto-generated cfg file. Do not edit! \n\n";
+    res << "PACKAGE = \"zivid_camera\"\n";
+    res << "import roslib\n";
+    res << "roslib.load_manifest(PACKAGE);\n";
+    res << "from dynamic_reconfigure.parameter_generator_catkin import *\n\n";
 
     res << "gen = ParameterGenerator()\n";
     if (insert_enabled_)
     {
-      res << "gen.add(\"enabled\", bool_t, 0, \"When frame is enabled it will be included in captures\", "
+      res << "gen.add(\"enabled\", bool_t, 0, \"When this acquisition is enabled it will be included in captures\", "
              "False)\n";
     }
     res << ss_.str();
@@ -219,23 +283,22 @@ private:
   std::stringstream ss_;
 };
 
+template <typename RootType>
 class ApplyConfigToZividSettingsGenerator
 {
 public:
-  ApplyConfigToZividSettingsGenerator(const std::string& zivid_settings_class_name,
-                                      const std::string& config_class_name)
-    : zivid_settings_class_name_(zivid_settings_class_name), config_class_name_(config_class_name)
+  ApplyConfigToZividSettingsGenerator(const std::string& config_class_name) : config_class_name_(config_class_name)
   {
   }
 
-  template <class ZividSettingNode>
-  void apply(const ZividSettingNode& s)
+  template <typename SettingsNode>
+  void apply(const SettingsNode& n)
   {
-    using T = NormalizedType<decltype(s)>;
+    using T = NormalizedType<decltype(n)>;
     using VT = typename T::ValueType;
 
-    const auto cfg_id = "cfg." + convertSettingsPathToConfigPath(s.path);
-    const auto setting_node_class_name = convertSettingsPathToZividClassName(zivid_settings_class_name_, s.path);
+    const auto cfg_id = "cfg." + convertSettingsPathToConfigPath<RootType, SettingsNode>();
+    const auto setting_node_class_name = fullyQualifiedZividClassType<SettingsNode>();
     ss_ << "  s.set(" + setting_node_class_name + "{ ";
 
     if constexpr (std::is_same_v<VT, std::size_t>)
@@ -255,10 +318,11 @@ public:
 
   std::string str()
   {
+    const auto root_type_fq = fullyQualifiedZividClassType<RootType>();
+
     std::stringstream res;
-    res << "static void apply" << config_class_name_
-        << "ConfigToZividSettings(const zivid_camera::" << config_class_name_
-        << "Config& cfg, Zivid::" << zivid_settings_class_name_ << "& s)\n";
+    res << "inline static void applyConfigToZividSettings(const zivid_camera::" << config_class_name_ << "Config& cfg, "
+        << root_type_fq << "& s)\n";
     res << "{\n";
     res << ss_.str();
     res << "}\n";
@@ -266,11 +330,11 @@ public:
   }
 
 private:
-  std::string zivid_settings_class_name_;
   std::string config_class_name_;
   std::stringstream ss_;
 };
 
+template <typename RootType>
 class ZividSettingsToMinMaxCurrentValueConfigGenerator
 {
 public:
@@ -281,32 +345,31 @@ public:
     Max,
   };
 
-  ZividSettingsToMinMaxCurrentValueConfigGenerator(const std::string& zivid_settings_class_name,
-                                                   const std::string& config_class_name, Type type)
-    : zivid_settings_class_name_(zivid_settings_class_name), config_class_name_(config_class_name), type_(type)
+  ZividSettingsToMinMaxCurrentValueConfigGenerator(const std::string& config_class_name, Type type)
+    : config_class_name_(config_class_name), type_(type)
   {
   }
 
-  template <class ZividSettingNode>
-  void apply(const ZividSettingNode& s)
+  template <typename SettingsNode>
+  void apply(const SettingsNode& n)
   {
-    using T = NormalizedType<decltype(s)>;
-    if (type_ == Type::CurrentValue || HasRange<T>::value)
+    using T = NormalizedType<decltype(n)>;
+    if (type_ == Type::CurrentValue || Zivid::DataModel::HasValidRange<T>::value)
     {
       using VT = typename T::ValueType;
-      const auto cfg_id = "cfg." + convertSettingsPathToConfigPath(s.path);
-      const auto zivid_class_name = convertSettingsPathToZividClassName(zivid_settings_class_name_, s.path);
+      const auto cfg_id = "cfg." + convertSettingsPathToConfigPath<RootType, SettingsNode>();
+      const auto zivid_node_class_name = fullyQualifiedZividClassType<SettingsNode>();
 
       const auto valueStr = [&]() {
-        std::string prefix = "s.get<" + zivid_class_name + ">()";
+        std::string prefix = "s.get<" + zivid_node_class_name + ">()";
         switch (type_)
         {
           case Type::CurrentValue:
             return prefix + ".value()";
           case Type::Min:
-            return prefix + ".range().min()";
+            return prefix + ".validRange().min()";
           case Type::Max:
-            return prefix + ".range().max()";
+            return prefix + ".validRange().max()";
         }
         throw std::runtime_error(std::string(__func__) + ": Unhandled enum: " + toString(type_));
       }();
@@ -340,7 +403,7 @@ public:
     throw std::runtime_error(std::string(__func__) + ": Unhandled enum: " + toString(type_));
   }
 
-  std::string str()
+  std::string str() const
   {
     const auto full_class_name = "zivid_camera::" + config_class_name_ + "Config";
 
@@ -357,9 +420,11 @@ public:
       throw std::runtime_error(std::string(__func__) + ": Unhandled enum: " + toString(type_));
     }();
 
+    const auto root_type_fq = fullyQualifiedZividClassType<RootType>();
+
     std::stringstream res;
-    res << "template<> " << full_class_name << " zividSettingsTo" << functionNameConfigType << "Config";
-    res << "<" << full_class_name << ">(const Zivid::" << zivid_settings_class_name_ << "& s)\n";
+    res << "template<> inline " << full_class_name << " zividSettingsTo" << functionNameConfigType << "Config";
+    res << "<" << full_class_name << ">(const " << root_type_fq << "& s)\n";
     res << "{\n";
     res << "  auto cfg = " + full_class_name << "::" << initializeConfigFunction() << "();\n";
     res << ss_.str();
@@ -374,33 +439,33 @@ public:
   }
 
 private:
-  std::string zivid_settings_class_name_;
   std::string config_class_name_;
   Type type_;
   std::stringstream ss_;
 };
 
+template <typename RootType>
 class ConfigUtilsHeaderGenerator
 {
 public:
-  ConfigUtilsHeaderGenerator(const std::string& zivid_settings_class_name, const std::string& config_class_name)
-    : apply_config_zivid_settings_gen(zivid_settings_class_name, config_class_name)
-    , zivid_settings_to_config_gen(zivid_settings_class_name, config_class_name,
-                                   ZividSettingsToMinMaxCurrentValueConfigGenerator::Type::CurrentValue)
-    , zivid_settings_to_min_config_gen(zivid_settings_class_name, config_class_name,
-                                       ZividSettingsToMinMaxCurrentValueConfigGenerator::Type::Min)
-    , zivid_settings_to_max_config_gen(zivid_settings_class_name, config_class_name,
-                                       ZividSettingsToMinMaxCurrentValueConfigGenerator::Type::Max)
+  ConfigUtilsHeaderGenerator(const std::string& config_class_name)
+    : apply_config_zivid_settings_gen(config_class_name)
+    , zivid_settings_to_config_gen(config_class_name,
+                                   ZividSettingsToMinMaxCurrentValueConfigGenerator<RootType>::Type::CurrentValue)
+    , zivid_settings_to_min_config_gen(config_class_name,
+                                       ZividSettingsToMinMaxCurrentValueConfigGenerator<RootType>::Type::Min)
+    , zivid_settings_to_max_config_gen(config_class_name,
+                                       ZividSettingsToMinMaxCurrentValueConfigGenerator<RootType>::Type::Max)
   {
   }
 
-  template <class ZividSetting>
-  void apply(const ZividSetting& s)
+  template <typename SettingsNode>
+  void apply(const SettingsNode& n)
   {
-    apply_config_zivid_settings_gen.apply(s);
-    zivid_settings_to_config_gen.apply(s);
-    zivid_settings_to_min_config_gen.apply(s);
-    zivid_settings_to_max_config_gen.apply(s);
+    apply_config_zivid_settings_gen.apply(n);
+    zivid_settings_to_config_gen.apply(n);
+    zivid_settings_to_min_config_gen.apply(n);
+    zivid_settings_to_max_config_gen.apply(n);
   }
 
   std::string str()
@@ -416,29 +481,28 @@ public:
     return res.str();
   }
 
-  ApplyConfigToZividSettingsGenerator apply_config_zivid_settings_gen;
-  ZividSettingsToMinMaxCurrentValueConfigGenerator zivid_settings_to_config_gen;
-  ZividSettingsToMinMaxCurrentValueConfigGenerator zivid_settings_to_min_config_gen;
-  ZividSettingsToMinMaxCurrentValueConfigGenerator zivid_settings_to_max_config_gen;
+  ApplyConfigToZividSettingsGenerator<RootType> apply_config_zivid_settings_gen;
+  ZividSettingsToMinMaxCurrentValueConfigGenerator<RootType> zivid_settings_to_config_gen;
+  ZividSettingsToMinMaxCurrentValueConfigGenerator<RootType> zivid_settings_to_min_config_gen;
+  ZividSettingsToMinMaxCurrentValueConfigGenerator<RootType> zivid_settings_to_max_config_gen;
 };
 
+template <typename RootType>
 class Generator
 {
 public:
-  template <class ZividSettings>
-  Generator(const ZividSettings& settings, const std::string& config_class_name)
-    : zivid_settings_class_name_(settings.name)
-    , config_class_name_(config_class_name)
+  Generator(const std::string& config_class_name)
+    : config_class_name_(config_class_name)
     , dynamic_reconfigure_cfg_gen_(config_class_name)
-    , config_utils_header_gen_(zivid_settings_class_name_, config_class_name)
+    , config_utils_header_gen_(config_class_name)
   {
   }
 
-  template <class ZividSettingNode>
-  void apply(const ZividSettingNode& s)
+  template <typename SettingsNode>
+  void apply(const SettingsNode& n)
   {
-    dynamic_reconfigure_cfg_gen_.apply(s);
-    config_utils_header_gen_.apply(s);
+    dynamic_reconfigure_cfg_gen_.apply(n);
+    config_utils_header_gen_.apply(n);
   }
 
   void insertEnabled()
@@ -453,65 +517,46 @@ public:
   }
 
 private:
-  std::string zivid_settings_class_name_;
   std::string config_class_name_;
-  DynamicReconfigureCfgGenerator dynamic_reconfigure_cfg_gen_;
-  ConfigUtilsHeaderGenerator config_utils_header_gen_;
+  DynamicReconfigureCfgGenerator<RootType> dynamic_reconfigure_cfg_gen_;
+  ConfigUtilsHeaderGenerator<RootType> config_utils_header_gen_;
 };
 
-template <typename ZividSettingNode>
-void traverseGeneralSettingsTree(const ZividSettingNode& s, Generator& general_settings)
+template <typename SettingsType, typename SettingsNode, typename RootType>
+void traverseSettingsTree(const SettingsNode& n, Generator<RootType>& generator)
 {
-  if constexpr (ZividSettingNode::isContainer)
+  if constexpr (std::is_same_v<SettingsNode, typename SettingsType::Acquisitions>)
   {
-    s.forEach([&](const auto& c) { traverseGeneralSettingsTree(c, general_settings); });
+    // Acquisitions ignored here. Acqusitition is handled separately.
+  }
+  else if constexpr (SettingsNode::nodeType == Zivid::DataModel::NodeType::group)
+  {
+    n.forEach([&](const auto& c) { traverseSettingsTree<SettingsType>(c, generator); });
   }
   else
   {
-    general_settings.apply(s);
+    generator.apply(n);
   }
 }
 
-template <typename ZividSettingNode>
-void traverseSettingsTree(const ZividSettingNode& s, Generator& general_settings, Generator& frame_settings)
+template <typename SettingsType>
+void addSettingsType(const std::string& cfgPrefix)
 {
-  if constexpr (is_general_setting<ZividSettingNode>)
-  {
-    traverseGeneralSettingsTree(s, general_settings);
-  }
-  else if constexpr (ZividSettingNode::isContainer)
-  {
-    s.forEach([&](const auto& c) { traverseSettingsTree(c, general_settings, frame_settings); });
-  }
-  else
-  {
-    frame_settings.apply(s);
-  }
-}
+  Generator<SettingsType> capture_general_gen(cfgPrefix);
+  traverseSettingsTree<SettingsType>(SettingsType{}, capture_general_gen);
+  capture_general_gen.writeToFiles();
 
-void traverseSettings2DTree(const Zivid::Settings2D& s, Generator& frame_settings)
-{
-  s.forEach([&](const auto& c) { frame_settings.apply(c); });
+  Generator<typename SettingsType::Acquisition> capture_acquisition_gen(cfgPrefix + "Acquisition");
+  traverseSettingsTree<SettingsType>(typename SettingsType::Acquisition{}, capture_acquisition_gen);
+  capture_acquisition_gen.insertEnabled();
+  capture_acquisition_gen.writeToFiles();
 }
 
 }  // namespace
 
 int main(int /*argc*/, char** /*argv*/)
 {
-  const auto settings = Zivid::Settings{};
-  Generator capture_general_gen(settings, "CaptureGeneral");
-  Generator capture_frame_gen(settings, "CaptureFrame");
-
-  traverseSettingsTree(settings, capture_general_gen, capture_frame_gen);
-  capture_frame_gen.insertEnabled();
-  capture_general_gen.writeToFiles();
-  capture_frame_gen.writeToFiles();
-
-  const auto settings2D = Zivid::Settings2D{};
-  Generator capture2D_frame_gen(settings2D, "Capture2DFrame");
-  traverseSettings2DTree(settings2D, capture2D_frame_gen);
-  capture2D_frame_gen.insertEnabled();
-  capture2D_frame_gen.writeToFiles();
-
+  addSettingsType<Zivid::Settings>("Settings");
+  addSettingsType<Zivid::Settings2D>("Settings2D");
   return 0;
 }
