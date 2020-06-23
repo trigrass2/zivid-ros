@@ -390,12 +390,12 @@ invoked. If only one acquisition is enabled the [capture](#capture) service perf
 one acquisition is enabled the [capture](#capture) service will perform a 3D HDR-capture. By default `enabled` is false.
 In order to capture a point cloud at least one acquisition needs to be enabled.
 
-| Name                                     | Type   |  Zivid API Setting             |
-|------------------------------------------|--------|--------------------------------|
+| Name                                     | Type   |  Zivid API Setting             |  Note  |
+|------------------------------------------|--------|--------------------------------|--------|
 | `settings/acquisition_<n>/enabled`       | bool   |  |
-| `settings/acquisition_<n>/aperture`      | double | [Settings::Acquisition::Aperture](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Acquisition_1_1Aperture.html)
+| `settings/acquisition_<n>/aperture`      | double | [Settings::Acquisition::Aperture](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Acquisition_1_1Aperture.html) | F-number
 | `settings/acquisition_<n>/brightness`    | double | [Settings::Acquisition::Brightness](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Acquisition_1_1Brightness.html)
-| `settings/acquisition_<n>/exposure_time` | int    | [Settings::Acquisition::ExposureTime](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Acquisition_1_1ExposureTime.html) Note: Specified in microseconds
+| `settings/acquisition_<n>/exposure_time` | int    | [Settings::Acquisition::ExposureTime](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Acquisition_1_1ExposureTime.html) | Microseconds
 | `settings/acquisition_<n>/gain`          | double | [Settings::Acquisition::Gain](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Acquisition_1_1Gain.html)
 
 #### Processing settings
@@ -408,21 +408,23 @@ In order to capture a point cloud at least one acquisition needs to be enabled.
 | `settings/processing_color_balance_green` | double | [Settings::Processing::Color::Balance::Green](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Color_1_1Balance_1_1Green.html)
 | `settings/processing_color_balance_red`   | double | [Settings::Processing::Color::Balance::Red](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Color_1_1Balance_1_1Red.html)
 | `settings/processing_filters_noise_removal_enabled`    | bool   | [Settings::Processing::Filters::Noise::Removal::Enabled](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Noise_1_1Removal_1_1Enabled.html)
-| `settings/processing_filters_noise_removal_threshold`    | bool   | [Settings::Processing::Filters::Noise::Removal::Threshold](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Noise_1_1Removal_1_1Threshold.html)
+| `settings/processing_filters_noise_removal_threshold`    | double   | [Settings::Processing::Filters::Noise::Removal::Threshold](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Noise_1_1Removal_1_1Threshold.html)
 | `settings/processing_filters_outlier_removal_enabled`    | bool   | [Settings::Processing::Filters::Outlier::Removal::Enabled](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Outlier_1_1Removal_1_1Enabled.html)
-| `settings/processing_filters_outlier_removal_threshold`    | bool   | [Settings::Processing::Filters::Outlier::Removal::Threshold](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Outlier_1_1Removal_1_1Threshold.html)
+| `settings/processing_filters_outlier_removal_threshold`    | double   | [Settings::Processing::Filters::Outlier::Removal::Threshold](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Outlier_1_1Removal_1_1Threshold.html)
 | `settings/processing_filters_reflection_removal_enabled`    | bool   | [Settings::Processing::Filters::Reflection::Removal::Enabled](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Reflection_1_1Removal_1_1Enabled.html)
 | `settings/processing_filters_smoothing_gaussian_enabled`    | bool   | [Settings::Processing::Filters::Smoothing::Gaussian::Enabled](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Smoothing_1_1Gaussian_1_1Enabled.html)
-| `settings/processing_filters_smoothing_gaussian_sigma`    | bool   | [Settings::Processing::Filters::Smoothing::Gaussian::Sigma](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Smoothing_1_1Gaussian_1_1Sigma.html)
+| `settings/processing_filters_smoothing_gaussian_sigma`    | double   | [Settings::Processing::Filters::Smoothing::Gaussian::Sigma](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Smoothing_1_1Gaussian_1_1Sigma.html)
 
 #### Experimental settings
 
-Note that settings that contain Epxerimental in the name may be changed, renamed or removed in future SDK releases.
+Note that these settings may be changed, renamed or removed in future SDK releases.
 
+| Name                                      | Type   |  Zivid API Setting             |
+|-------------------------------------------|--------|--------------------------------|
 | `settings/processing_filters_experimental_contrast_distortion_correction_enabled`    | bool   | [Settings::Processing::Filters::Experimental::ContrastDistortion::Correction::Enabled](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Experimental_1_1ContrastDistortion_1_1Correction_1_1Enabled.html)
-| `settings/processing_filters_experimental_contrast_distortion_correction_strength`    | bool   | [Settings::Processing::Filters::Experimental::ContrastDistortion::Correction::Strength](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Experimental_1_1ContrastDistortion_1_1Correction_1_1Strength.html)
+| `settings/processing_filters_experimental_contrast_distortion_correction_strength`    | double   | [Settings::Processing::Filters::Experimental::ContrastDistortion::Correction::Strength](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Experimental_1_1ContrastDistortion_1_1Correction_1_1Strength.html)
 | `settings/processing_filters_experimental_contrast_distortion_removal_enabled`    | bool   | [Settings::Processing::Filters::Experimental::ContrastDistortion::Removal::Enabled](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Experimental_1_1ContrastDistortion_1_1Removal_1_1Enabled.html)
-| `settings/processing_filters_experimental_contrast_distortion_removal_threshold`    | bool   | [Settings::Processing::Filters::Experimental::ContrastDistortion::Removal::Threshold](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Experimental_1_1ContrastDistortion_1_1Removal_1_1Threshold.html)
+| `settings/processing_filters_experimental_contrast_distortion_removal_threshold`    | double   | [Settings::Processing::Filters::Experimental::ContrastDistortion::Removal::Threshold](https://www.zivid.com/hubfs/softwarefiles/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings_1_1Processing_1_1Filters_1_1Experimental_1_1ContrastDistortion_1_1Removal_1_1Threshold.html)
 
 
 ### 2D settings
@@ -433,12 +435,12 @@ To trigger a 2D capture, invoke the [capture_2d](#capture_2d) service. Note that
 `settings_2d/acquisition_0/enabled` is default false, and must be set to true before
 calling the [capture_2d](#capture_2d) service, otherwise the service will return an error.
 
-| Name                                      | Type   |  Zivid API Setting             |
-|-------------------------------------------|--------|--------------------------------|
+| Name                                      | Type   |  Zivid API Setting             |  Note  |
+|-------------------------------------------|--------|--------------------------------|--------|
 | `settings_2d/acquisition_0/enabled`       | bool   | |
-| `settings_2d/acquisition_0/aperture`      | int    | [Settings2D::Acquisition::Aperture](https://www.zivid.com/software/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings2D_1_1Iris.html)
+| `settings_2d/acquisition_0/aperture`      | double    | [Settings2D::Acquisition::Aperture](https://www.zivid.com/software/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings2D_1_1Aperture.html) | F-number
 | `settings_2d/acquisition_0/brightness`    | double | [Settings2D::Acquisition::Brightness](https://www.zivid.com/software/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings2D_1_1Brightness.html)
-| `settings_2d/acquisition_0/exposure_time` | int    | [Settings2D::Acquisition::ExposureTime](https://www.zivid.com/software/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings2D_1_1ExposureTime.html) Note: Specified in microseconds
+| `settings_2d/acquisition_0/exposure_time` | int    | [Settings2D::Acquisition::ExposureTime](https://www.zivid.com/software/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings2D_1_1ExposureTime.html) | Microseconds
 | `settings_2d/acquisition_0/gain`          | double | [Settings2D::Acquisition::Gain](https://www.zivid.com/software/releases/2.0.0-beta-1+6b13d5ad-356/doc/cpp/classZivid_1_1Settings2D_1_1Gain.html)
 
 #### Processing settings

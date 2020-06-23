@@ -13,8 +13,11 @@ This project adheres to [Semantic Versioning](https://semver.org).
   replaces the old "contrast" values from SDK 1.0.
 * Changes to how capture settings are configured:
   * The available settings, and the names and paths of the settings, has been updated to match
-    the SDK 2.0 API. Note that some settings have been removed in 2.0. See the [README](./README.md)
-    for a table of the supported settings in 2.0.
+    the SDK 2.0 API. Note that some settings have been removed in 2.0. In addition the default
+    values for some settings have changed. See the [README](./README.md) for a table of the
+    supported settings in 2.0. See the
+    [SDK Changelog](https://www.zivid.com/software/releases/2.0.0-beta-1+6b13d5ad-356/Changelog.md)
+    for all changes to settings.
   * The dynamic_reconfigure node "capture/general/" has been renamed to "settings/".
   * The dynamic_reconfigure nodes "capture/frame_<n>/" has been renamed to "settings/acquisition_<n>/".
   * The dynamic_reconfigure nodes "capture_2d/frame_0/" has been renamed to "settings_2d/acquisition_0/".
